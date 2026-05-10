@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PetBreath</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--card:#1e2535;--card2:#242d3f;
+  --teal:#00d4a8;--teal2:#00b08c;--teal3:rgba(0,212,168,0.12);
+  --coral:#ff6b6b;--amber:#ffb347;
+  --text:#e6edf3;--muted:#7d8590;--border:rgba(255,255,255,0.08);
+  --r:12px;--r2:8px;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+h1,h2,h3{font-family:'Syne',sans-serif}
+button{cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+input,select,textarea{font-family:inherit;outline:none}
+.hidden{display:none!important}
+#screen-loading{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;min-height:100vh}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-text{color:var(--muted);font-size:.95rem}
+#screen-auth{display:flex;align-items:center;justify-content:center;padding:2rem;min-height:100vh;background:radial-gradient(ellipse at 30% 20%,rgba(0,212,168,0.07) 0%,transparent 60%)}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2.5rem;width:100%;max-width:460px}
+.brand{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--teal);margin-bottom:4px}
+.brand span{color:var(--text);font-weight:400}
+.tagline{color:var(--muted);font-size:.9rem;margin-bottom:1.75rem}
+.tab-row{display:flex;gap:4px;background:var(--bg2);border-radius:var(--r2);padding:4px;margin-bottom:1.5rem}
+.tab-btn{flex:1;padding:8px;border-radius:6px;background:transparent;color:var(--muted);font-size:.9rem;font-family:'Syne',sans-serif;font-weight:700}
+.tab-btn.active{background:var(--teal);color:#000}
+.role-row{display:flex;gap:8px;margin-bottom:1.25rem}
+.role-btn{flex:1;padding:12px 8px;border-radius:var(--r2);background:var(--bg2);border:1px solid var(--border);color:var(--muted);font-size:.85rem;display:flex;flex-direction:column;align-items:center;gap:5px}
+.role-btn.active{background:var(--teal3);border-color:var(--teal);color:var(--teal)}
+.role-icon{font-size:1.4rem}
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:10px 14px;color:var(--text);font-size:.95rem;transition:border .2s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--teal)}
+.fg select option{background:var(--bg2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.btn-primary{width:100%;background:var(--teal);color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;padding:12px;border-radius:var(--r2);margin-top:4px}
+.btn-primary:hover{background:var(--teal2)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.msg-err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.3);color:var(--coral);padding:10px 14px;border-radius:var(--r2);font-size:.85rem;margin-bottom:1rem}
+.msg-ok{background:rgba(0,212,168,.1);border:1px solid rgba(0,212,168,.3);color:var(--teal);padding:10px 14px;border-radius:var(--r2);font-size:.85rem;margin-bottom:1rem}
+#screen-app{display:flex;flex-direction:column;min-height:100vh}
+.nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+.nav-brand{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:var(--teal)}
+.nav-brand span{color:var(--text);font-weight:400}
+.nav-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.nav-email{font-size:.82rem;color:var(--muted)}
+.nav-role{background:var(--teal3);color:var(--teal);font-size:.72rem;padding:3px 10px;border-radius:20px;border:1px solid rgba(0,212,168,.2)}
+.btn-logout{background:transparent;color:var(--muted);font-size:.82rem;padding:5px 12px;border-radius:var(--r2);border:1px solid var(--border)}
+.btn-logout:hover{color:var(--coral);border-color:var(--coral)}
+.main{flex:1;padding:1.5rem;max-width:1100px;margin:0 auto;width:100%}
+.page-tabs{display:flex;gap:4px;background:var(--card);border-radius:var(--r2);padding:5px;margin-bottom:1.75rem;width:fit-content;flex-wrap:wrap}
+.page-tab{padding:7px 16px;border-radius:6px;background:transparent;color:var(--muted);font-size:.88rem;font-family:'Syne',sans-serif;font-weight:700}
+.page-tab.active{background:var(--teal);color:#000}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.full{grid-column:1/-1}
+@media(max-width:680px){.grid2{grid-template-columns:1fr}.full{grid-column:1}.form-row{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem}
+.card-title{font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0}
+.counter-wrap{text-align:center}
+.ring-wrap{position:relative;width:180px;height:180px;margin:0 auto 1.25rem}
+.ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-n{font-family:'Syne',sans-serif;font-size:2.8rem;font-weight:800;color:var(--teal);line-height:1}
+.ring-l{font-size:.72rem;color:var(--muted);margin-top:3px}
+.btn-start{width:100%;background:var(--teal);color:#000;font-family:'Syne',sans-serif;font-weight:700;padding:13px;border-radius:var(--r2);font-size:.95rem;margin-bottom:.6rem}
+.btn-start:hover{background:var(--teal2)}
+.btn-count{width:100%;background:var(--card2);color:var(--text);border:2px solid var(--teal);font-family:'Syne',sans-serif;font-weight:700;padding:14px;border-radius:var(--r2);font-size:1.1rem;margin-bottom:.6rem}
+.btn-count:hover{background:var(--teal3)}
+.btn-count:active{transform:scale(.97)}
+.btn-reset{width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);padding:9px;border-radius:var(--r2);font-size:.88rem;margin-top:.5rem}
+.result-num{font-family:'Syne',sans-serif;font-size:3rem;font-weight:800;line-height:1}
+.result-lbl{font-size:.85rem;color:var(--muted);margin-top:4px;margin-bottom:.75rem}
+.alert-box{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);border-radius:var(--r2);padding:.9rem;display:flex;align-items:center;gap:10px;color:var(--coral);font-size:.88rem;margin-top:.75rem;text-align:left}
+.ok-box{color:var(--teal);font-size:.88rem;margin-top:.75rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem}
+.chip{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:.83rem;color:var(--muted);cursor:pointer}
+.chip.active{background:var(--teal3);border-color:var(--teal);color:var(--teal)}
+.chip:hover{border-color:var(--teal)}
+.add-pet-form{background:var(--bg2);border-radius:var(--r2);padding:1rem;margin-top:.75rem}
+.chart-wrap{position:relative;height:210px}
+.tbl{width:100%;border-collapse:collapse;font-size:.85rem}
+.tbl th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);text-transform:uppercase;font-size:.72rem;letter-spacing:.5px}
+.tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.tbl tr:last-child td{border-bottom:none}
+.badge-ok{background:rgba(0,212,168,.15);color:var(--teal);padding:3px 8px;border-radius:10px;font-size:.75rem}
+.badge-warn{background:rgba(255,107,107,.15);color:var(--coral);padding:3px 8px;border-radius:10px;font-size:.75rem}
+.msg-list{display:flex;flex-direction:column;gap:.75rem;max-height:420px;overflow-y:auto}
+.msg-item{background:var(--bg2);border-radius:var(--r2);padding:1rem;border-left:3px solid var(--teal)}
+.msg-item.unread{border-left-color:var(--amber)}
+.msg-meta{font-size:.75rem;color:var(--muted);margin-bottom:4px}
+.msg-text{font-size:.88rem;line-height:1.5}
+.compose-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:1rem}
+.compose-wrap textarea{width:100%;background:transparent;border:none;padding:1rem;color:var(--text);font-size:.9rem;resize:none;min-height:80px;display:block}
+.compose-footer{padding:.75rem;display:flex;justify-content:flex-end;border-top:1px solid var(--border)}
+.btn-send{background:var(--teal);color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;padding:8px 20px;border-radius:var(--r2)}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--card2);border-radius:var(--r2);padding:1.25rem;text-align:center}
+.stat-n{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--teal)}
+.stat-l{font-size:.78rem;color:var(--muted);margin-top:4px}
+.ann-item{background:var(--bg2);border-radius:var(--r2);padding:1.25rem;margin-bottom:.75rem;border-left:3px solid var(--teal)}
+.ann-title{font-family:'Syne',sans-serif;font-weight:700;margin-bottom:5px}
+.ann-date{font-size:.75rem;color:var(--muted);margin-bottom:8px}
+.ann-body{font-size:.88rem;line-height:1.6;color:rgba(230,237,243,.8)}
+.owner-list{display:flex;flex-direction:column;gap:.6rem}
+.owner-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;cursor:pointer}
+.owner-item:hover,.owner-item.active{border-color:var(--teal);background:var(--teal3)}
+.owner-name{font-weight:500;font-size:.9rem}
+.owner-sub{font-size:.78rem;color:var(--muted);margin-top:3px}
+.btn-export{background:var(--teal3);color:var(--teal);border:1px solid rgba(0,212,168,.3);padding:7px 16px;border-radius:var(--r2);font-size:.83rem;font-weight:500}
+.flex-between{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+.empty{text-align:center;color:var(--muted);padding:2rem;font-size:.9rem}
+.tbl-wrap{overflow-x:auto}
+/* PET PHOTO */
+.pet-avatar{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);margin-bottom:.75rem}
+.pet-avatar-placeholder{width:80px;height:80px;border-radius:50%;background:var(--bg2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:2rem;margin-bottom:.75rem;cursor:pointer}
+.photo-upload-btn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:6px 14px;font-size:.82rem;color:var(--muted);cursor:pointer;margin-bottom:.75rem}
+.photo-upload-btn:hover{border-color:var(--teal);color:var(--teal)}
+/* VET NOTE */
+.vet-note{background:var(--bg2);border-radius:var(--r2);padding:.9rem;margin-bottom:.6rem;border-left:3px solid var(--amber)}
+.vet-note-date{font-size:.72rem;color:var(--muted);margin-bottom:4px}
+.vet-note-text{font-size:.88rem;line-height:1.5}
+/* DATE FILTER */
+.date-filter{display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.date-filter input{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:6px 10px;color:var(--text);font-size:.82rem;width:140px}
+.date-filter label{font-size:.8rem;color:var(--muted)}
+.btn-filter{background:var(--teal3);color:var(--teal);border:1px solid rgba(0,212,168,.3);padding:6px 14px;border-radius:var(--r2);font-size:.82rem}
+</style>
+</head>
+<body>
+<div id="screen-loading"><div class="spinner"></div><div class="load-text">PetBreath yükleniyor...</div></div>
+<div id="screen-auth" class="hidden">
+  <div class="auth-card">
+    <div class="brand">Pet<span>Breath</span></div>
+    <div class="tagline">Dinlenme Solunum Takip Sistemi</div>
+    <div class="tab-row">
+      <button class="tab-btn active" id="btn-tab-login" onclick="switchAuthTab('login')">Giriş</button>
+      <button class="tab-btn" id="btn-tab-register" onclick="switchAuthTab('register')">Kayıt</button>
+    </div>
+    <div id="auth-msg"></div>
+    <div id="login-form">
+      <div class="fg"><label>E-posta</label><input type="email" id="l-email" placeholder="ornek@email.com"/></div>
+      <div class="fg"><label>Şifre</label><input type="password" id="l-pass" placeholder="Şifreniz"/></div>
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">Giriş Yap</button>
+    </div>
+    <div id="register-form" class="hidden">
+      <div class="role-row">
+        <button class="role-btn active" id="role-owner" onclick="setRole('owner')"><span class="role-icon">🐾</span><span>Hasta Sahibi</span></button>
+        <button class="role-btn" id="role-vet" onclick="setRole('vet')"><span class="role-icon">🩺</span><span>Veteriner</span></button>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Ad</label><input id="r-fname" placeholder="Adınız"/></div>
+        <div class="fg"><label>Soyad</label><input id="r-lname" placeholder="Soyadınız"/></div>
+      </div>
+      <div class="fg"><label>Telefon</label><input id="r-phone" placeholder="05xx xxx xx xx"/></div>
+      <div class="fg hidden" id="fg-clinic"><label>Veteriner Kliniği</label><input id="r-clinic" placeholder="Klinik adı"/></div>
+      <div class="fg" id="fg-vet"><label>Veteriner Hekiminiz</label>
+        <select id="r-vet"><option value="">— Hekimim listede yok —</option></select>
+      </div>
+      <div class="fg"><label>E-posta</label><input type="email" id="r-email" placeholder="ornek@email.com"/></div>
+      <div class="fg"><label>Şifre</label><input type="password" id="r-pass" placeholder="En az 6 karakter"/></div>
+      <button class="btn-primary" id="btn-register" onclick="doRegister()">Kayıt Ol</button>
+    </div>
+  </div>
+</div>
+<div id="screen-app" class="hidden">
+  <nav class="nav">
+    <div class="nav-brand">Pet<span>Breath</span></div>
+    <div class="nav-right">
+      <span class="nav-email" id="nav-email"></span>
+      <span class="nav-role" id="nav-role"></span>
+      <button class="btn-logout" onclick="doLogout()">Çıkış</button>
+    </div>
+  </nav>
+  <div class="main" id="main-content"></div>
+</div>
+<script>
+const SUPA_URL='https://stobylohcrzdbkjvxius.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0b2J5bG9oY3J6ZGJranZ4aXVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjkxNzQsImV4cCI6MjA5NDAwNTE3NH0.RM5FBA9D7Zrf5Cv6AL0B5jQp8XXT6biZ87rukjK2woY';
+const ADMIN_EMAIL='admin@petbreath.vet';
+const LIMIT=35;
+const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
+let CU=null,CR=null,CO=null,CV=null,selPet=null,selOwner=null,authRole='owner',timerInt=null,bChart=null;
+const $=id=>document.getElementById(id);
+const show=id=>$(id).classList.remove('hidden');
+const hide=id=>$(id).classList.add('hidden');
+const fmtDate=d=>new Date(d).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+const fmtDateShort=d=>new Date(d).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+async function init(){
+  try{
+    await loadVetList();
+    const{data:{session}}=await sb.auth.getSession();
+    hide('screen-loading');
+    if(session?.user)await loadUser(session.user);
+    else show('screen-auth');
+  }catch(e){hide('screen-loading');show('screen-auth');}
+}
+
+async function loadVetList(){
+  const{data}=await sb.from('veterinarians').select('id,first_name,last_name,clinic_name');
+  const sel=$('r-vet');
+  (data||[]).forEach(v=>{const o=document.createElement('option');o.value=v.id;o.textContent=v.first_name+' '+v.last_name+' — '+v.clinic_name;sel.appendChild(o);});
+}
+
+async function loadUser(user){
+  CU=user;
+  if(user.email===ADMIN_EMAIL){CR='admin';}
+  else{
+    const{data:vet}=await sb.from('veterinarians').select('*').eq('user_id',user.id).single();
+    if(vet){CR='vet';CV=vet;}
+    else{const{data:owner}=await sb.from('pet_owners').select('*').eq('user_id',user.id).single();CR='owner';CO=owner;}
+  }
+  $('nav-email').textContent=user.email;
+  $('nav-role').textContent=CR==='admin'?'Admin':CR==='vet'?'Veteriner':'Hasta Sahibi';
+  hide('screen-auth');show('screen-app');
+  renderDash();
+}
+
+function switchAuthTab(t){
+  $('btn-tab-login').classList.toggle('active',t==='login');
+  $('btn-tab-register').classList.toggle('active',t==='register');
+  $('login-form').classList.toggle('hidden',t!=='login');
+  $('register-form').classList.toggle('hidden',t!=='register');
+  $('auth-msg').innerHTML='';
+}
+
+function setRole(r){
+  authRole=r;
+  $('role-owner').classList.toggle('active',r==='owner');
+  $('role-vet').classList.toggle('active',r==='vet');
+  $('fg-clinic').classList.toggle('hidden',r!=='vet');
+  $('fg-vet').classList.toggle('hidden',r!=='owner');
+}
+
+async function doLogin(){
+  const email=$('l-email').value,pass=$('l-pass').value;
+  $('auth-msg').innerHTML='';
+  const btn=$('btn-login');btn.disabled=true;btn.textContent='Lütfen bekleyin...';
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  btn.disabled=false;btn.textContent='Giriş Yap';
+  if(error){$('auth-msg').innerHTML=`<div class="msg-err">${error.message}</div>`;return;}
+  await loadUser(data.user);
+}
+
+async function doRegister(){
+  const fname=$('r-fname').value,lname=$('r-lname').value,phone=$('r-phone').value;
+  const email=$('r-email').value,pass=$('r-pass').value,clinic=$('r-clinic').value,vetId=$('r-vet').value;
+  if(!fname||!lname||!phone||!email||!pass){$('auth-msg').innerHTML='<div class="msg-err">Tüm alanları doldurun</div>';return;}
+  if(authRole==='vet'&&!clinic){$('auth-msg').innerHTML='<div class="msg-err">Klinik adı zorunludur</div>';return;}
+  const btn=$('btn-register');btn.disabled=true;btn.textContent='Kaydediliyor...';
+  const{data,error}=await sb.auth.signUp({email,password:pass});
+  if(error){$('auth-msg').innerHTML=`<div class="msg-err">${error.message}</div>`;btn.disabled=false;btn.textContent='Kayıt Ol';return;}
+  const uid=data.user.id;
+  if(authRole==='vet')await sb.from('veterinarians').insert({user_id:uid,first_name:fname,last_name:lname,phone,email,clinic_name:clinic});
+  else await sb.from('pet_owners').insert({user_id:uid,first_name:fname,last_name:lname,phone,email,vet_id:vetId||null});
+  btn.disabled=false;btn.textContent='Kayıt Ol';
+  $('auth-msg').innerHTML='<div class="msg-ok">Kayıt başarılı! Giriş yapabilirsiniz.</div>';
+  switchAuthTab('login');
+}
+
+async function doLogout(){await sb.auth.signOut();CU=null;CR=null;CO=null;CV=null;hide('screen-app');show('screen-auth');}
+
+function renderDash(){
+  if(CR==='owner')renderOwner('counter');
+  else if(CR==='vet')renderVet('patients');
+  else renderAdmin('overview');
+}
+
+// ── OWNER ──────────────────────────────────────────────────────────────────────
+async function renderOwner(tab){
+  if(!CO){const{data}=await sb.from('pet_owners').select('*').eq('user_id',CU.id).single();CO=data;}
+  $('main-content').innerHTML=`<div class="page-tabs">
+    <button class="page-tab ${tab==='counter'?'active':''}" onclick="renderOwner('counter')">Solunum Sayacı</button>
+    <button class="page-tab ${tab==='history'?'active':''}" onclick="renderOwner('history')">Geçmiş</button>
+    <button class="page-tab ${tab==='pets'?'active':''}" onclick="renderOwner('pets')">Hayvan Profilleri</button>
+    <button class="page-tab ${tab==='messages'?'active':''}" onclick="renderOwner('messages')">Mesajlar</button>
+    <button class="page-tab ${tab==='ann'?'active':''}" onclick="renderOwner('ann')">Duyurular</button>
+  </div><div id="tc"></div>`;
+  if(tab==='counter')await ownerCounter();
+  else if(tab==='history')await ownerHistory();
+  else if(tab==='pets')await ownerPets();
+  else if(tab==='messages')await ownerMessages();
+  else await renderAnn('tc');
+}
+
+async function ownerCounter(){
+  const{data:pets}=await sb.from('pets').select('*').eq('owner_id',CO.id);
+  if(!selPet&&pets&&pets.length>0)selPet=pets[0];
+  $('tc').innerHTML=`<div class="grid2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Hayvanlarım</div>
+      <div class="chips" id="pc"></div>
+      <button class="chip" onclick="toggleAddPet()">+ Hayvan Ekle</button>
+      <div id="apf" class="hidden"><div class="add-pet-form">
+        <div class="form-row">
+          <div class="fg"><label>İsim</label><input id="np-name" placeholder="Hayvan adı"/></div>
+          <div class="fg"><label>Tür</label><select id="np-sp"><option value="dog">Köpek</option><option value="cat">Kedi</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Irk</label><input id="np-br" placeholder="Opsiyonel"/></div>
+          <div class="fg"><label>Cinsiyet</label><select id="np-gn"><option value="unknown">Bilinmiyor</option><option value="male">Erkek</option><option value="female">Dişi</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Doğum Tarihi</label><input type="date" id="np-bd"/></div>
+          <div class="fg"><label>Kilo (kg)</label><input type="number" step="0.1" id="np-wt" placeholder="örn: 4.5"/></div>
+        </div>
+        <div class="fg"><label>Renk / İşaretler</label><input id="np-cl" placeholder="örn: Turuncu, sol kulağında leke"/></div>
+        <div class="fg"><label>Hastalık Tanısı</label><input id="np-dx" placeholder="örn: Hipertrofik kardiyomiyopati"/></div>
+        <div class="fg"><label>Alerjiler</label><input id="np-al" placeholder="örn: Penisilin"/></div>
+        <div class="fg"><label>Notlar</label><textarea id="np-nt" rows="2" placeholder="Ek bilgiler..."></textarea></div>
+        <button class="btn-primary" style="margin-top:0" onclick="savePet()">Kaydet</button>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>${selPet?selPet.name+' — Solunum Sayacı':'Hayvan Seçin'}</div>
+      <div id="ca">${selPet?'':'<div class="empty">Solunumu saymak için hayvan seçin</div>'}</div>
+    </div>
+  </div>`;
+  const pc=$('pc');
+  (pets||[]).forEach(p=>{
+    const b=document.createElement('button');
+    b.className='chip'+(selPet?.id===p.id?' active':'');
+    b.textContent=(p.species==='cat'?'🐱':'🐶')+' '+p.name;
+    b.onclick=()=>{selPet=p;ownerCounter();};
+    pc.appendChild(b);
+  });
+  if(selPet)startCounterUI('ca');
+}
+
+window.toggleAddPet=()=>$('apf').classList.toggle('hidden');
+
+window.savePet=async()=>{
+  const name=$('np-name').value,species=$('np-sp').value,breed=$('np-br').value;
+  const gender=$('np-gn').value,birth_date=$('np-bd').value||null,weight=$('np-wt').value||null;
+  const color=$('np-cl').value,diagnosis=$('np-dx').value,allergies=$('np-al').value,notes=$('np-nt').value;
+  if(!name)return;
+  const{data}=await sb.from('pets').insert({owner_id:CO.id,name,species,breed,gender,birth_date,
+    weight:weight?parseFloat(weight):null,color,diagnosis,allergies,notes}).select().single();
+  selPet=data;ownerCounter();
+};
+
+function startCounterUI(areaId){
+  let phase='idle',timeLeft=60,count=0;
+  function draw(){
+    const r=75,circ=2*Math.PI*r,pct=((60-timeLeft)/60)*100,dash=circ*(pct/100);
+    let h=`<div class="counter-wrap">
+      <div class="ring-wrap">
+        <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg)">
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="${phase==='counting'?'#00d4a8':'#444d5c'}" stroke-width="10" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-num"><div class="ring-n">${phase==='idle'?60:timeLeft}</div><div class="ring-l">${phase==='idle'?'saniye':'saniye kaldı'}</div></div>
+      </div>`;
+    if(phase==='idle')h+=`<button class="btn-start" id="btn-s">▶ Sayımı Başlat</button>`;
+    else if(phase==='counting')h+=`<button class="btn-count" id="btn-c">🫁 Nefes Say &nbsp;<strong style="font-size:1.4rem">${count}</strong></button><div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Her nefes alışta butona basın</div>`;
+    else{
+      h+=`<div class="result-num" style="color:${count>LIMIT?'var(--coral)':'var(--teal)'}">${count}</div><div class="result-lbl">solunum / dakika</div>`;
+      if(count>LIMIT)h+=`<div class="alert-box">⚠️ <span>Solunum sayısı normalin üzerinde! Veteriner hekiminize bildirim gönderildi.</span></div>`;
+      else h+=`<div class="ok-box">✓ Normal solunum aralığında</div>`;
+    }
+    if(phase!=='idle')h+=`<button class="btn-reset" id="btn-r">↺ Sıfırla</button>`;
+    h+='</div>';
+    $(areaId).innerHTML=h;
+    if(phase==='idle')$('btn-s').onclick=()=>{
+      phase='counting';timeLeft=60;count=0;
+      clearInterval(timerInt);
+      timerInt=setInterval(()=>{timeLeft--;if(timeLeft<=0){clearInterval(timerInt);phase='done';saveBreath(count);}draw();},1000);
+      draw();
+    };
+    if(phase==='counting')$('btn-c').onclick=()=>{count++;draw();};
+    if(phase!=='idle'&&$('btn-r'))$('btn-r').onclick=()=>{clearInterval(timerInt);phase='idle';timeLeft=60;count=0;draw();};
+  }
+  draw();
+}
+
+async function saveBreath(count){
+  await sb.from('breath_measurements').insert({pet_id:selPet.id,owner_id:CO.id,count});
+  if(count>LIMIT&&CO.vet_id){
+    await sb.from('messages').insert({owner_id:CO.id,pet_id:selPet.id,recipient_vet_id:CO.vet_id,sender_id:CU.id,
+      content:`⚠️ UYARI: ${selPet.name} adlı hastanın dakikadaki solunum sayısı ${count} olarak ölçüldü. Normal sınırın (${LIMIT}) üzerindedir. Lütfen kontrol edin.`});
+  }
+}
+
+async function ownerHistory(){
+  const{data:pets}=await sb.from('pets').select('*').eq('owner_id',CO.id);
+  if(!selPet&&pets&&pets.length>0)selPet=pets[0];
+  const today=new Date().toISOString().split('T')[0];
+  const monthAgo=new Date(Date.now()-30*24*3600000).toISOString().split('T')[0];
+  $('tc').innerHTML=`<div class="grid2">
+    <div class="card"><div class="card-title"><span class="dot"></span>Hayvan Seç</div><div class="chips" id="hc"></div></div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Solunum Grafiği${selPet?' — '+selPet.name:''}</div>
+      <div class="date-filter">
+        <label>Başlangıç</label><input type="date" id="df-start" value="${monthAgo}"/>
+        <label>Bitiş</label><input type="date" id="df-end" value="${today}"/>
+        <button class="btn-filter" onclick="applyFilter()">Filtrele</button>
+      </div>
+      <div class="chart-wrap"><canvas id="bc"></canvas></div>
+    </div>
+    <div class="card full"><div class="card-title"><span class="dot"></span>Ölçüm Geçmişi</div>
+      <div id="hist-table-wrap"></div>
+    </div>
+  </div>`;
+  const hc=$('hc');
+  (pets||[]).forEach(p=>{
+    const b=document.createElement('button');
+    b.className='chip'+(selPet?.id===p.id?' active':'');
+    b.textContent=(p.species==='cat'?'🐱':'🐶')+' '+p.name;
+    b.onclick=()=>{selPet=p;ownerHistory();};
+    hc.appendChild(b);
+  });
+  if(selPet)await loadHistoryData(monthAgo,today);
+}
+
+window.applyFilter=async()=>{
+  const start=$('df-start').value,end=$('df-end').value;
+  if(selPet)await loadHistoryData(start,end);
+};
+
+async function loadHistoryData(start,end){
+  if(!selPet)return;
+  let q=sb.from('breath_measurements').select('*').eq('pet_id',selPet.id).order('measured_at',{ascending:false});
+  if(start)q=q.gte('measured_at',start+'T00:00:00');
+  if(end)q=q.lte('measured_at',end+'T23:59:59');
+  const{data:meas}=await q.limit(50);
+  const m=meas||[];
+  if(m.length>0)drawChart([...m].reverse());
+  const wrap=$('hist-table-wrap');
+  if(wrap)wrap.innerHTML=`<table class="tbl"><thead><tr><th>Tarih</th><th>Solunum/dk</th><th>Durum</th></tr></thead><tbody>
+    ${m.map(x=>`<tr><td>${fmtDate(x.measured_at)}</td>
+      <td style="font-family:Syne,sans-serif;font-weight:700;color:${x.count>LIMIT?'var(--coral)':'var(--teal)'}">${x.count}</td>
+      <td>${x.count>LIMIT?'<span class="badge-warn">⚠ Yüksek</span>':'<span class="badge-ok">✓ Normal</span>'}</td>
+    </tr>`).join('')||'<tr><td colspan="3" class="empty">Bu tarih aralığında ölçüm yok</td></tr>'}
+  </tbody></table>`;
+}
+
+function drawChart(meas){
+  const canvas=$('bc');if(!canvas)return;
+  if(bChart){bChart.destroy();bChart=null;}
+  const labels=meas.map(m=>fmtDateShort(m.measured_at));
+  const counts=meas.map(m=>m.count);
+  bChart=new Chart(canvas,{type:'line',data:{labels,datasets:[
+    {label:'Solunum/dk',data:counts,borderColor:'#00d4a8',backgroundColor:'rgba(0,212,168,0.08)',borderWidth:2,
+     pointBackgroundColor:counts.map(c=>c>LIMIT?'#ff6b6b':'#00d4a8'),pointRadius:5,tension:0.3,fill:true},
+    {label:'Limit ('+LIMIT+')',data:new Array(counts.length).fill(LIMIT),borderColor:'rgba(255,107,107,0.4)',
+     borderDash:[5,5],borderWidth:1,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#7d8590',font:{size:11}}}},
+    scales:{x:{ticks:{color:'#7d8590',font:{size:10},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},
+            y:{ticks:{color:'#7d8590',font:{size:11}},grid:{color:'rgba(255,255,255,0.05)'},min:0,suggestedMax:50}}
+  }});
+}
+
+async function ownerPets(){
+  const{data:pets}=await sb.from('pets').select('*').eq('owner_id',CO.id);
+  if(!selPet&&pets&&pets.length>0)selPet=pets[0];
+  let meds=[],vetNotes=[];
+  if(selPet){
+    const{data:m}=await sb.from('medications').select('*').eq('pet_id',selPet.id).order('created_at',{ascending:false});meds=m||[];
+    const{data:vn}=await sb.from('vet_notes').select('*').eq('pet_id',selPet.id).order('created_at',{ascending:false});vetNotes=vn||[];
+  }
+  const gTr={male:'Erkek',female:'Dişi',unknown:'Bilinmiyor'};
+  const photoHtml=selPet?.photo_url
+    ?`<img src="${selPet.photo_url}" class="pet-avatar" alt="Profil fotoğrafı"/>`
+    :`<div class="pet-avatar-placeholder" onclick="triggerPhotoUpload()">🐾</div>`;
+  const petInfo=selPet?`
+    <div style="text-align:center;margin-bottom:1rem">
+      ${photoHtml}
+      <label class="photo-upload-btn"><input type="file" id="photo-input" accept="image/*" style="display:none" onchange="uploadPhoto(this)"/>📷 Fotoğraf Yükle</label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;font-size:.88rem;margin-bottom:1rem">
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">TÜR</span>${selPet.species==='cat'?'🐱 Kedi':'🐶 Köpek'}</div>
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">IRK</span>${selPet.breed||'—'}</div>
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">CİNSİYET</span>${gTr[selPet.gender]||'—'}</div>
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">KİLO</span>${selPet.weight?selPet.weight+' kg':'—'}</div>
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">DOĞUM</span>${selPet.birth_date||'—'}</div>
+      <div><span style="color:var(--muted);font-size:.72rem;display:block">RENK</span>${selPet.color||'—'}</div>
+    </div>
+    ${selPet.diagnosis?`<div style="background:var(--teal3);border:1px solid rgba(0,212,168,.2);border-radius:var(--r2);padding:.75rem;margin-bottom:.6rem"><div style="font-size:.7rem;color:var(--teal);margin-bottom:3px">TANI</div>${selPet.diagnosis}</div>`:''}
+    ${selPet.allergies?`<div style="background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:var(--r2);padding:.75rem;margin-bottom:.6rem"><div style="font-size:.7rem;color:var(--coral);margin-bottom:3px">ALERJİLER</div>${selPet.allergies}</div>`:''}
+    ${selPet.notes?`<div style="background:var(--bg2);border-radius:var(--r2);padding:.75rem"><div style="font-size:.7rem;color:var(--muted);margin-bottom:3px">NOTLAR</div>${selPet.notes}</div>`:''}
+  `:'<div class="empty">Hayvan seçin</div>';
+
+  $('tc').innerHTML=`<div class="grid2">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Hayvanlarım</div>
+      <div class="chips" id="pp-chips"></div>
+    </div>
+    <div class="card"><div class="card-title"><span class="dot"></span>${selPet?selPet.name+' — Profil':'Hayvan Seçin'}</div>${petInfo}</div>
+    <div class="card">
+      <div class="card-title flex-between">
+        <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span>İlaçlar</span>
+        ${selPet?'<button class="chip" onclick="toggleMedForm()">+ İlaç Ekle</button>':''}
+      </div>
+      <div id="med-form-wrap" class="hidden"><div class="add-pet-form" style="margin-bottom:1rem">
+        <div class="form-row">
+          <div class="fg"><label>İlaç Adı</label><input id="med-name" placeholder="örn: Furosemid"/></div>
+          <div class="fg"><label>Doz</label><input id="med-dose" placeholder="örn: 12.5 mg"/></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Kullanım Sıklığı</label><input id="med-freq" placeholder="örn: Günde 2 kez"/></div>
+          <div class="fg"><label>Başlangıç Tarihi</label><input type="date" id="med-start"/></div>
+        </div>
+        <button class="btn-primary" style="margin-top:0" onclick="saveMed()">İlacı Kaydet</button>
+      </div></div>
+      <table class="tbl"><thead><tr><th>İlaç</th><th>Doz</th><th>Sıklık</th><th>Durum</th></tr></thead><tbody>
+        ${meds.map(m=>`<tr>
+          <td style="font-weight:500">${m.name}</td><td>${m.dose||'—'}</td><td>${m.frequency||'—'}</td>
+          <td>${m.is_active?'<span class="badge-ok">Aktif</span>':'<span style="color:var(--muted);font-size:.78rem">Pasif</span>'}</td>
+        </tr>`).join('')||'<tr><td colspan="4" class="empty">İlaç kaydı yok</td></tr>'}
+      </tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Veteriner Notları</div>
+      ${vetNotes.map(n=>`<div class="vet-note"><div class="vet-note-date">${fmtDate(n.created_at)}</div><div class="vet-note-text">${n.note}</div></div>`).join('')||'<div class="empty">Veteriner notu yok</div>'}
+    </div>
+  </div>`;
+
+  const chips=$('pp-chips');
+  (pets||[]).forEach(p=>{
+    const b=document.createElement('button');
+    b.className='chip'+(selPet?.id===p.id?' active':'');
+    b.textContent=(p.species==='cat'?'🐱':'🐶')+' '+p.name;
+    b.onclick=()=>{selPet=p;ownerPets();};
+    chips.appendChild(b);
+  });
+}
+
+window.toggleMedForm=()=>$('med-form-wrap').classList.toggle('hidden');
+
+window.saveMed=async()=>{
+  const name=$('med-name').value,dose=$('med-dose').value,frequency=$('med-freq').value,start_date=$('med-start').value||null;
+  if(!name||!selPet)return;
+  await sb.from('medications').insert({pet_id:selPet.id,name,dose,frequency,start_date,is_active:true});
+  ownerPets();
+};
+
+window.uploadPhoto=async(input)=>{
+  if(!input.files[0]||!selPet)return;
+  const file=input.files[0];
+  const ext=file.name.split('.').pop();
+  const path=`${selPet.id}/photo.${ext}`;
+  const{error}=await sb.storage.from('pet-photos').upload(path,file,{upsert:true});
+  if(error){alert('Fotoğraf yüklenemedi: '+error.message);return;}
+  const{data:{publicUrl}}=sb.storage.from('pet-photos').getPublicUrl(path);
+  await sb.from('pets').update({photo_url:publicUrl}).eq('id',selPet.id);
+  selPet.photo_url=publicUrl;
+  ownerPets();
+};
+
+async function ownerMessages(){
+  if(!CO.vet_id){$('tc').innerHTML=`<div class="card"><div class="card-title"><span class="dot"></span>Mesajlar</div><div class="empty">Mesaj göndermek için hesabınıza veteriner hekim bağlı olmalıdır.</div></div>`;return;}
+  const{data:msgs}=await sb.from('messages').select('*').eq('owner_id',CO.id).order('created_at',{ascending:false}).limit(30);
+  $('tc').innerHTML=`<div class="card"><div class="card-title"><span class="dot"></span>Veterinerime Mesaj</div>
+    <div class="compose-wrap"><textarea id="mi" placeholder="Mesajınızı yazın..."></textarea>
+    <div class="compose-footer"><button class="btn-send" onclick="sendOwnerMsg()">Gönder →</button></div></div>
+    <div class="msg-list">${(msgs||[]).map(m=>`<div class="msg-item"><div class="msg-meta">${fmtDate(m.created_at)}</div><div class="msg-text">${m.content}</div></div>`).join('')||'<div class="empty">Henüz mesaj yok</div>'}</div>
+  </div>`;
+}
+
+window.sendOwnerMsg=async()=>{
+  const txt=$('mi').value.trim();if(!txt)return;
+  await sb.from('messages').insert({owner_id:CO.id,recipient_vet_id:CO.vet_id,pet_id:selPet?.id||null,content:txt,sender_id:CU.id});
+  ownerMessages();
+};
+
+async function renderAnn(id){
+  const{data}=await sb.from('announcements').select('*').order('created_at',{ascending:false}).limit(10);
+  $(id).innerHTML=(data||[]).map(a=>`<div class="ann-item"><div class="ann-title">${a.title}</div><div class="ann-date">${fmtDate(a.created_at)}</div><div class="ann-body">${a.content}</div></div>`).join('')||'<div class="empty">Henüz duyuru yok</div>';
+}
+
+// ── VET ────────────────────────────────────────────────────────────────────────
+async function renderVet(tab){
+  const{data:owners}=await sb.from('pet_owners').select('*').eq('vet_id',CV.id);
+  const{data:msgs}=await sb.from('messages').select('*').eq('recipient_vet_id',CV.id).order('created_at',{ascending:false}).limit(30);
+  const unread=(msgs||[]).filter(m=>!m.is_read).length;
+  $('main-content').innerHTML=`<div class="page-tabs">
+    <button class="page-tab ${tab==='patients'?'active':''}" onclick="renderVet('patients')">Hastalarım</button>
+    <button class="page-tab ${tab==='messages'?'active':''}" onclick="renderVet('messages')">Mesajlar${unread>0?' ('+unread+')':''}</button>
+    <button class="page-tab ${tab==='ann'?'active':''}" onclick="renderVet('ann')">Duyurular</button>
+  </div><div id="tc"></div>`;
+  if(tab==='patients')await vetPatients(owners||[]);
+  else if(tab==='messages')vetMessages(msgs||[],owners||[]);
+  else renderAnn('tc');
+}
+
+async function vetPatients(owners){
+  let detail='<div class="empty">Hasta sahibi seçin</div>';
+  if(selOwner){
+    const{data:pets}=await sb.from('pets').select('*').eq('owner_id',selOwner.id);
+    if(!selPet&&pets&&pets.length>0)selPet=pets[0];
+    const chips=(pets||[]).map(p=>`<button class="chip${selPet?.id===p.id?' active':''}" onclick="vetSelPet('${p.id}')">${p.species==='cat'?'🐱':'🐶'} ${p.name}</button>`).join('');
+    let mhtml='';
+    if(selPet){
+      const[{data:meas},{data:meds},{data:vnotes}]=await Promise.all([
+        sb.from('breath_measurements').select('*').eq('pet_id',selPet.id).order('measured_at',{ascending:false}).limit(20),
+        sb.from('medications').select('*').eq('pet_id',selPet.id).eq('is_active',true),
+        sb.from('vet_notes').select('*').eq('pet_id',selPet.id).order('created_at',{ascending:false}).limit(5)
+      ]);
+      const photoHtml=selPet.photo_url?`<img src="${selPet.photo_url}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--teal);margin-right:1rem" alt=""/>`:'';
+      const infoHtml=`<div style="display:flex;align-items:center;margin-bottom:.75rem">
+        ${photoHtml}
+        <div style="font-size:.85rem">
+          ${selPet.breed?`<div><span style="color:var(--muted)">Irk: </span>${selPet.breed}</div>`:''}
+          ${selPet.weight?`<div><span style="color:var(--muted)">Kilo: </span>${selPet.weight} kg</div>`:''}
+          ${selPet.diagnosis?`<div><span style="color:var(--teal)">Tanı: </span>${selPet.diagnosis}</div>`:''}
+          ${selPet.allergies?`<div><span style="color:var(--coral)">Alerji: </span>${selPet.allergies}</div>`:''}
+        </div>
+      </div>`;
+      const medHtml=(meds||[]).length>0?`<div style="margin-bottom:.75rem">${(meds||[]).map(m=>`<span style="background:var(--teal3);border:1px solid rgba(0,212,168,.2);border-radius:20px;padding:3px 10px;font-size:.78rem;color:var(--teal);margin-right:4px;margin-bottom:4px;display:inline-block">${m.name}${m.dose?' '+m.dose:''}</span>`).join('')}</div>`:'';
+      const noteHtml=`
+        <div style="margin-bottom:.75rem">
+          <div class="compose-wrap"><textarea id="vn-input" placeholder="Hasta için not ekle..." rows="2"></textarea>
+          <div class="compose-footer"><button class="btn-send" onclick="saveVetNote()">Not Kaydet</button></div></div>
+          ${(vnotes||[]).map(n=>`<div class="vet-note"><div class="vet-note-date">${fmtDate(n.created_at)}</div><div class="vet-note-text">${n.note}</div></div>`).join('')}
+        </div>`;
+      const measTable=`<div class="chart-wrap" style="margin-bottom:1rem"><canvas id="bc"></canvas></div>
+        <table class="tbl"><thead><tr><th>Tarih</th><th>Solunum/dk</th><th>Durum</th></tr></thead><tbody>
+        ${(meas||[]).map(m=>`<tr><td style="font-size:.8rem">${fmtDate(m.measured_at)}</td>
+          <td style="font-family:Syne,sans-serif;font-weight:700;color:${m.count>LIMIT?'var(--coral)':'var(--teal)'}">${m.count}</td>
+          <td>${m.count>LIMIT?'<span class="badge-warn">⚠</span>':'<span class="badge-ok">✓</span>'}</td>
+        </tr>`).join('')||'<tr><td colspan="3" class="empty">Ölçüm yok</td></tr>'}</tbody></table>`;
+      mhtml=infoHtml+medHtml+noteHtml+measTable;
+      setTimeout(async()=>{
+        const{data:m2}=await sb.from('breath_measurements').select('*').eq('pet_id',selPet.id).order('measured_at',{ascending:true}).limit(20);
+        if(m2&&m2.length>0)drawChart(m2);
+      },50);
+    }
+    detail=`<div class="chips">${chips}</div>${mhtml}`;
+  }
+  $('tc').innerHTML=`<div class="grid2">
+    <div class="card"><div class="card-title"><span class="dot"></span>Hasta Sahipleri (${owners.length})</div>
+      <div class="owner-list">${owners.map(o=>`<div class="owner-item${selOwner?.id===o.id?' active':''}" onclick="vetSelOwner('${o.id}')">
+        <div class="owner-name">${o.first_name} ${o.last_name}</div><div class="owner-sub">${o.phone} · ${o.email}</div>
+      </div>`).join('')||'<div class="empty">Henüz hasta sahibi yok</div>'}</div>
+    </div>
+    <div class="card" style="overflow-y:auto;max-height:80vh"><div class="card-title"><span class="dot"></span>${selOwner?selOwner.first_name+"'in Hayvanları":'Hasta Sahibi Seçin'}</div>${detail}</div>
+  </div>`;
+}
+
+window.vetSelOwner=async id=>{
+  const{data:owners}=await sb.from('pet_owners').select('*').eq('vet_id',CV.id);
+  selOwner=owners.find(o=>o.id===id);selPet=null;renderVet('patients');
+};
+
+window.vetSelPet=async id=>{
+  const{data:pets}=await sb.from('pets').select('*').eq('owner_id',selOwner.id);
+  selPet=pets.find(p=>p.id===id);renderVet('patients');
+};
+
+window.saveVetNote=async()=>{
+  const note=$('vn-input').value.trim();
+  if(!note||!selPet||!CV)return;
+  await sb.from('vet_notes').insert({pet_id:selPet.id,vet_id:CV.id,note});
+  renderVet('patients');
+};
+
+function vetMessages(msgs,owners){
+  $('tc').innerHTML=`<div class="card"><div class="card-title"><span class="dot"></span>Gelen Mesajlar</div>
+    <div class="msg-list">${msgs.map(m=>{
+      const o=owners.find(x=>x.id===m.owner_id);
+      return`<div class="msg-item${!m.is_read?' unread':''}">
+        <div class="msg-meta">${o?o.first_name+' '+o.last_name+' · ':''} ${fmtDate(m.created_at)} ${!m.is_read?'<span style="color:var(--amber)">● Yeni</span>':''}</div>
+        <div class="msg-text">${m.content}</div></div>`;
+    }).join('')||'<div class="empty">Henüz mesaj yok</div>'}</div></div>`;
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────────────────────
+async function renderAdmin(tab){
+  const[oR,vR,mR,aR]=await Promise.all([
+    sb.from('pet_owners').select('*'),
+    sb.from('veterinarians').select('*'),
+    sb.from('breath_measurements').select('*').order('measured_at',{ascending:false}).limit(100),
+    sb.from('announcements').select('*').order('created_at',{ascending:false})
+  ]);
+  const owners=oR.data||[],vets=vR.data||[],meas=mR.data||[],anns=aR.data||[];
+  window._owners=owners;
+  const alerts=meas.filter(m=>m.count>LIMIT);
+  $('main-content').innerHTML=`<div class="page-tabs">
+    <button class="page-tab ${tab==='overview'?'active':''}" onclick="renderAdmin('overview')">Genel Bakış</button>
+    <button class="page-tab ${tab==='owners'?'active':''}" onclick="renderAdmin('owners')">Hasta Sahipleri</button>
+    <button class="page-tab ${tab==='vets'?'active':''}" onclick="renderAdmin('vets')">Veterinerler</button>
+    <button class="page-tab ${tab==='ann'?'active':''}" onclick="renderAdmin('ann')">Duyurular</button>
+  </div><div id="tc"></div>`;
+  const tc=$('tc');
+  if(tab==='overview'){
+    tc.innerHTML=`<div class="stat-row">
+      <div class="stat-card"><div class="stat-n">${owners.length}</div><div class="stat-l">Hasta Sahibi</div></div>
+      <div class="stat-card"><div class="stat-n">${vets.length}</div><div class="stat-l">Veteriner</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--coral)">${alerts.length}</div><div class="stat-l">Yüksek Ölçüm</div></div>
+    </div><div class="card"><div class="card-title"><span class="dot"></span>Son Yüksek Ölçümler (35+)</div>
+      <table class="tbl"><thead><tr><th>Tarih</th><th>Solunum/dk</th></tr></thead><tbody>
+        ${alerts.slice(0,10).map(m=>`<tr><td>${fmtDate(m.measured_at)}</td><td style="color:var(--coral);font-family:Syne,sans-serif;font-weight:700">${m.count}</td></tr>`).join('')
+        ||'<tr><td colspan="2" class="empty">Yüksek ölçüm yok</td></tr>'}
+      </tbody></table></div>`;
+  }else if(tab==='owners'){
+    tc.innerHTML=`<div class="card"><div class="card-title flex-between">
+      <span style="display:flex;align-items:center;gap:8px"><span class="dot"></span>Hasta Sahipleri (${owners.length})</span>
+      <button class="btn-export" onclick="exportCSV()">⬇ CSV İndir</button></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ad Soyad</th><th>Telefon</th><th>E-posta</th><th>Veteriner</th><th>Kayıt</th></tr></thead><tbody>
+        ${owners.map(o=>{const v=vets.find(x=>x.id===o.vet_id);return`<tr>
+          <td style="font-weight:500">${o.first_name} ${o.last_name}</td><td>${o.phone}</td>
+          <td style="color:var(--teal)">${o.email}</td>
+          <td style="color:var(--muted);font-size:.8rem">${v?v.first_name+' '+v.last_name:'—'}</td>
+          <td style="color:var(--muted);font-size:.78rem">${fmtDate(o.created_at)}</td>
+        </tr>`;}).join('')}
+      </tbody></table></div></div>`;
+  }else if(tab==='vets'){
+    tc.innerHTML=`<div class="card"><div class="card-title"><span class="dot"></span>Veteriner Hekimler (${vets.length})</div>
+      <table class="tbl"><thead><tr><th>Ad Soyad</th><th>Klinik</th><th>Telefon</th><th>E-posta</th></tr></thead><tbody>
+        ${vets.map(v=>`<tr><td style="font-weight:500">${v.first_name} ${v.last_name}</td><td>${v.clinic_name}</td><td>${v.phone}</td><td style="color:var(--teal)">${v.email}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }else if(tab==='ann'){
+    tc.innerHTML=`<div class="grid2">
+      <div class="card"><div class="card-title"><span class="dot"></span>Yeni Duyuru</div>
+        <div class="fg"><label>Başlık</label><input id="at" placeholder="Duyuru başlığı"/></div>
+        <div class="fg"><label>İçerik</label><textarea id="ab" rows="4" placeholder="Duyuru içeriği..."></textarea></div>
+        <button class="btn-primary" style="margin-top:0" onclick="postAnn()">Yayınla</button>
+      </div>
+      <div class="card"><div class="card-title"><span class="dot"></span>Yayınlanan Duyurular</div>
+        ${anns.map(a=>`<div class="ann-item"><div class="ann-title">${a.title}</div><div class="ann-date">${fmtDate(a.created_at)}</div><div class="ann-body">${a.content}</div></div>`).join('')||'<div class="empty">Duyuru yok</div>'}
+      </div></div>`;
+  }
+}
+
+window.postAnn=async()=>{
+  const title=$('at').value,content=$('ab').value;
+  if(!title||!content)return;
+  await sb.from('announcements').insert({title,content,created_by:CU.id});
+  renderAdmin('ann');
+};
+
+window.exportCSV=()=>{
+  const owners=window._owners||[];
+  const rows=[['Ad','Soyad','Telefon','E-posta','Kayıt'],...owners.map(o=>[o.first_name,o.last_name,o.phone,o.email,fmtDate(o.created_at)])];
+  const csv=rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='hasta_sahipleri.csv';a.click();
+};
+
+init();
+</script>
+</body>
+</html>
